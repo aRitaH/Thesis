@@ -1,0 +1,2242 @@
+install.packages("tidyverse")
+library(tidyverse)
+install.packages("scales")
+library(scales)
+install.packages("faraway")
+library(faraway)
+install.packages("gmodels")
+library(gmodels)
+install.packages("aod")
+library(aod)
+install.packages("SDMTools")
+library(SDMTools)
+install.packages("stats")
+library(stats)
+install.packages("lmtest")
+library(lmtest)
+install.packages("zoo")
+library(zoo)
+install.packages("Epi")
+library(Epi)
+install.packages("mgcv")
+library(mgcv)
+install.packages("sm")
+library(sm)
+install.packages("rms")
+library(rms)
+install.packages("MASS")
+library(MASS)
+install.packages("tidyr")
+library(tidyr)
+install.packages("devtools")
+library(devtools)
+install.packages("dplyr")
+library(dplyr)
+library(asbio)
+install.packages("data.table")
+library(data.table)
+library(effects)
+install.packages("survival")
+library(survival)
+install.packages("car")
+library(car)
+install.packages("xlsx")
+library(xlsx)
+install.packages("sjPlot")
+library(sjPlot)
+library(SDMTools)
+install.packages("ResourceSelection")
+library(ResourceSelection)
+###Stukel test
+##' @name stukel
+##' @export
+##' @include genLogi.R
+##' @title Stukels test of the logistic link
+##'
+##' @description
+##' Calculates Stukels test for a logistic regression model.
+##' \cr \cr
+##' This determines the appropriateness of the logistic link.
+##' \cr \cr
+##' Two new covariates, z1 and z2 are generated such that
+##' \deqn{ z1=0.5*logit^2*I(pi>=0.5), z2=-0.5*logit^2*I(pi<=0.5) }
+##' where \eqn{I(arg)=1} where arg is true and \eqn{=0} where false.
+##' \cr \cr
+##' Tests if significant
+##' change occurs in the model with the addition of these coefficients.
+##'
+##' @param object An object of class \bold{glm}
+##' @param alternative add both \eqn{z1} and \eqn{z2} to model or just
+##' one of the above
+##' @return A list with the following elemens:
+##' \item{statistic}{value of statistic}
+##' \item{parameter}{degrees of freedom}
+##' \item{p.value}{if \eqn{<0.05} suggests should accept null hypothesis that
+##' logistic model is incorrect for the data}
+##' \item{alternative}{alternative}
+##' \item{method}{method}
+##' \item{data.name}{name of object}
+##' \item{allstat}{statistics for all tests}
+##' \item{allpar}{degrees of freedom}
+##' \item{allpval}{all p values}
+##' @author Brett Presnell
+##' @references
+##' \href{http://http://www.stat.ufl.edu/~presnell/Courses/sta7249-2008sp/R/Src/stukel.R}{University of Florida}
+##' @keywords htest
+##' @examples
+##' set.seed(1)
+##' m1 <- genLogiDf(b=3,f=0,c=0,n=50)$model
+##' stukel(m1)
+##'
+stukel <- function(object, alternative = c("both", "alpha1", "alpha2")) {
+  DNAME <- deparse(substitute(object))
+  METHOD <- "Stukel's test of the logistic link"
+  alternative <- match.arg(alternative)
+  eta <- predict(object, type = "link")
+  etasq <- 0.5 * eta * eta
+  ### is positive?
+  etapos <- eta > 0
+  dv <- matrix(0, nrow = length(eta), ncol = 2)
+  dv[etapos, 1] <- etasq[etapos]
+  dv[!etapos, 2] <- - etasq[!etapos]
+  colnames(dv) <- c("z1", "z2")
+  oinfo <- stats::vcov(object)
+  ### qr decomposition of matrix
+  oX <- qr.X(object$qr)
+  ImH <- - oX %*% oinfo %*% t(oX)
+  diag(ImH) <- 1 + diag(ImH)
+  wdv <- sqrt(object$weights) * dv
+  qmat <- t(wdv) %*% ImH %*% wdv
+  sc <- apply(dv * (object$weights * residuals(object, "working")), 2, sum)
+  allstat <- c(sc * sc / diag(qmat), sc %*% solve(qmat) %*% sc)
+  names(allstat) <- c("alpha1", "alpha2", "both")
+  allpar <- c(1,1,2)
+  names(allpar) <- names(allstat)
+  allpval <- pchisq(allstat, allpar, lower.tail=FALSE)
+  STATISTIC <- allstat[alternative]
+  PARAMETER <- allpar[alternative]
+  names(PARAMETER) <- "df"
+  PVAL <- allpval[alternative]
+  names(allpar) <- rep("df", 3)
+  structure(list(statistic = STATISTIC,
+                 parameter = PARAMETER,
+                 p.value = PVAL,
+                 alternative = alternative,
+                 method = METHOD, data.name = DNAME,
+                 allstat = allstat, allpar = allpar, allpval = allpval
+  ),
+  class = "htest")
+}
+
+#write.csv2(ALS, "C:/Users//User//Desktop//ALSNA.csv",sep = ";")
+getwd()
+# Abrir os dados
+setwd("/Users/ritahenriquesepidoc/Desktop/Tese")
+getwd()
+
+ALS<-read.csv("/Users/ritahenriquesepidoc/Desktop/Tese/ALS.csv",sep = ";",header = TRUE, na.strings = c (""))
+
+
+##############################
+### Transformar em fatores ###
+#############################
+
+ALS$Type<-factor(ALS$Type)
+levels(ALS$Type)<-c("Controls","Patients")
+Type<-ALS$Type
+table(Type)
+
+ALS$Gender<-factor(ALS$Gender)
+levels(ALS$Gender)<-c("Female","Male")
+Gender<-ALS$Gender
+table(Gender)
+
+ALS$Smoking<-factor(ALS$Smoking)
+levels(ALS$Smoking)<-c("Non Smoking", "Smoking","Ex-Smoking")
+Smoking<-ALS$Smoking
+table(Smoking)
+
+
+ALS$C9<-factor(ALS$C9)
+levels(ALS$C9)<-c("No","Yes")
+C9<-ALS$C9
+table(C9)
+
+ALS$SOD1<-factor(ALS$SOD1)
+levels(ALS$SOD1)<-c("No","Yes")
+SOD1<-ALS$SOD1
+table(SOD1)
+
+ALS$Contact<-factor(ALS$Contact)
+levels(ALS$Contact)<-c("No","Yes")
+Contact<-ALS$Contact
+table(Contact)
+
+ALS$Onset<-factor(ALS$Onset)
+levels(ALS$Onset)<-c("Limbs","Bulbar")
+Onset<-ALS$Onset
+table(Onset)
+
+ALS$Football<-factor(ALS$Football)
+levels(ALS$Football)<-c("Doesn’t practice", "Mild","Moderate","Intense")
+levels(ALS$Football)[3:4]<-("Intense")
+Football<-ALS$Football
+table(Football)
+
+ALS$Age<-as.numeric(ALS$Age)
+ALS$TE<-as.numeric(ALS$TE)
+ALS$Age.1st.Sym<-as.numeric(ALS$Age.1st.Sym)
+ALS$Diagnostic.delay<-as.numeric(ALS$Diagnostic.delay)
+ALS$ALSFRS.R.T<-as.numeric(ALS$ALSFRS.R.T)
+ALS$ALSFRS.R<-as.numeric(ALS$ALSFRS.R)
+
+
+
+#Transformar Age em numerico
+#Tabelas de contigência avaliar se existe mais de 20% das células com valor inferior a 5
+
+xtabs(~Type+Gender)# Todas as células superiores a 5
+xtabs(~Type+Smoking)# Todas as células superiores a 5
+xtabs(~Type+PE)# Todas as células superiores a 5
+xtabs(~Type+Football)# 2 células iguais a 0
+xtabs(~Type+Contact)#Todas as células superiores a 5
+
+xtabs(~Onset+Gender)# Todas as células superiores a 5
+xtabs(~Onset+Smoking)# Todas as células superiores a 5
+xtabs(~Onset+PE)# Todas as célulads ssuperiores a 5
+xtabs(~Onset+Football)
+xtabs(~Onset+Contact)
+
+
+###########
+###Plots###
+###########
+#Género(Total)
+
+ggplot(ALS, aes(x = Gender,fill=Gender)) +
+  geom_bar(aes( y = (..count..)/sum(..count..))) +
+  scale_y_continuous(labels = percent_format(), limits=c(0,0.6)) +theme_classic()+
+  labs(title = "Individuals Gender", x = "Gender", y = "Percentage of individuals")
+
+#Género Pacientes vs Controlos
+
+ggplot(ALS, aes(Gender, group = Type)) +
+  geom_bar(aes(y = ..prop.., fill = factor(Type)), stat="count",position = "dodge") +
+  scale_y_continuous(labels=scales::percent) +theme(panel.background = element_rect(fill = "white"),axis.text=element_text(size=20),
+                                                    axis.title=element_text(size=20),axis.line = element_line(color="black"),legend.text = element_text(size = 20),legend.title = element_text(size = 20),title = element_text(size = 20))+labs(title ="Patients VS Controls Gender", x = "Gender", y = "Relative frequencies",fill="Type")
+#Smoking(Total)
+Q2<-complete.cases(ALS[,c("Smoking")])
+ALS.CC2<-ALS[Q2,]
+
+ggplot(ALS.CC2, aes(x = Smoking,fill=Smoking)) +
+  geom_bar(aes( y = (..count..)/sum(..count..))) +
+  scale_y_continuous(labels = percent_format(), limits=c(0,0.6)) +theme_classic()+
+  labs(title = "Smoking habits", x = "Smoking", y = "Percentage of individuals")
+
+#Smoking Controls VS Patients
+Q2<-complete.cases(ALS[,c("Smoking","Type")])
+ALS.CC2<-ALS[Q2,]
+
+ggplot(ALS.CC2, aes(Smoking, group = Type)) +
+  geom_bar(aes(y = ..prop.., fill = factor(Type)), stat="count",position = "dodge") +
+  scale_y_continuous(labels=scales::percent) +theme(panel.background = element_rect(fill = "white"),axis.text=element_text(size=20),
+                                                    axis.title=element_text(size=20),axis.line = element_line(color="black"),legend.text = element_text(size = 20),legend.title = element_text(size = 20),title = element_text(size = 20))+labs(title ="Smoking Habits Patients Vs Controls", x = "Onset", y = "Relative frequencies",fill="Type")
+# Somoking Gender
+
+ggplot(ALS.CC2, aes(Smoking, group = Type)) +
+  geom_bar(aes(y = ..prop.., fill = factor(Type)), stat="count",position = "dodge") +
+  scale_y_continuous(labels=scales::percent)+ theme(panel.background = element_rect(fill = "white"),axis.text=element_text(size=12),
+                                                    axis.title=element_text(size=20),axis.line = element_line(color="black"),legend.text = element_text(size = 20),legend.title = element_text(size = 20),title = element_text(size = 20),strip.text.x = element_text(size = 20))+labs(title ="Patients VS Controls Smoking habits by Gender", x = "Smoking Habits", y = "Relative frequencies",fill="Type")+facet_wrap(~Gender)
+
+#Smoking Contact
+
+Q2<-complete.cases(ALS[,c("Smoking","Type","Contact")])
+ALS.CC2<-ALS[Q2,]
+table(ALS.CC2$Contact,ALS.CC2$Type,ALS.CC2$Smoking)
+
+
+
+ggplot(ALS.CC2, aes(Smoking, group = Type)) +
+  geom_bar(aes(y = ..prop.., fill = factor(Type)), stat="count",position = "dodge") +
+  scale_y_continuous(labels=scales::percent)+ theme(panel.background = element_rect(fill = "white"),axis.text=element_text(size=20),
+                                                    axis.title=element_text(size=20),axis.line = element_line(color="black"),legend.text = element_text(size = 20),legend.title = element_text(size = 20),title = element_text(size = 20),strip.text.x = element_text(size = 20))+labs(title ="Patients VS Controls Contact Sports", x = "Contact Sports", y = "Relative frequencies",fill="Type")+facet_wrap(~Contact)
+
+
+#Smoking Onset
+
+ggplot(data=subset(ALS,Onset!="NA" & Smoking!="NA"), aes(Smoking))+
+  geom_bar(aes(fill=as.factor(Onset), y = (..count..)/sum(..count..)), position="dodge") +
+  scale_y_continuous(labels=percent,limits=c(0,0.6))+theme_classic()+labs(title ="Onset Smoking", x = "Smoking", y = "Percentage of individuals",fill="Onset")
+
+#Regular PE Total
+
+ggplot(data=ALS, aes(x = PE,fill=PE)) +
+  geom_bar(aes( y = (..count..)/sum(..count..))) +
+  scale_y_continuous(labels = percent_format(), limits=c(0,0.6)) +theme_classic()+
+  labs(title = "Regular Physical Activity", x = "R.PE", y = "Percentage of individuals")
+
+#PE Pacienst VS Controls
+ggplot(data=ALS, aes(PE))+
+  geom_bar(aes(fill=as.factor(Type), y = (..count..)/sum(..count..)), position="dodge") +
+  scale_y_continuous(labels=percent,limits=c(0,0.6))+theme_classic()+labs(title ="Patients VS Controls Regular PE", x = "R.PE", y = "Percentage of individuals",fill="Type")
+
+#PE Onset
+
+ggplot(data=subset(ALS,Onset!="NA" ), aes(PE))+
+  geom_bar(aes(fill=as.factor(Onset), y = (..count..)/sum(..count..)), position="dodge") +
+  scale_y_continuous(labels=percent,limits=c(0,0.6))+theme_classic()+labs(title ="Onset Regular PE", x = "R.PE", y = "Percentage of individuals",fill="Onset")
+
+#Contact SPorts
+
+ggplot(ALS.CC2, aes(x = Contact,fill=Contact)) +
+  geom_bar(aes( y = (..count..)/sum(..count..))) +
+  scale_y_continuous(labels = percent_format(), limits=c(0,0.6)) +theme_classic()+
+  labs(title = "Patients VS Controls Contact Sports", x =  "Contact Sports", y = "Percentage of individuals")
+
+
+
+#Contact Pacienst VS Controls
+
+ggplot(data=ALS.CC2,aes(Contact,group=Type))+
+  geom_bar(aes(y = ..prop.., fill = factor(Type)), stat="count",position = "dodge") +
+  facet_wrap(~Gender) +scale_y_continuous(labels=scales::percent)+theme_classic()+labs(title ="Patients VS Controls Contact Sports", x = "Contact Sports", y = "Percentage of individuals",fill="Type")
+
+ggplot(data=ALS.CC2,aes(Football,group=Type))+
+  geom_bar(aes(y = ..prop.., fill = factor(Type)), stat="count",position = "dodge") +
+  facet_wrap(~Gender) +scale_y_continuous(labels=scales::percent)+theme_classic()+labs(title ="Patients VS Controls Contact Sports", x = "Contact Sports", y = "Percentage of individuals",fill="Type")
+
+
+
+#Contact Pacienst VS Controls by Gender
+
+Q2<-complete.cases(ALS[,c("Contact","Gender","Type")])
+ALS.CC2<-ALS[Q2,]
+
+ggplot(data=ALS.CC2,aes(ALS.CC2$Contact))+
+  geom_bar(aes(fill=as.factor(Type), y = (..count..)/sum(..count..)), position="dodge",na.rm = TRUE) +
+  facet_wrap(~Gender) +scale_y_continuous(labels=percent,limits=c(0,0.6))+theme(panel.background = element_rect(fill = "white"),axis.text=element_text(size=20),
+                                                                                axis.title=element_text(size=20),axis.line = element_line(color="black"),legend.text = element_text(size = 20),legend.title = element_text(size = 20),title = element_text(size = 20))+labs(title ="Patients VS Controls Contact Sports", x = "Contact Sports", y = "Percentage of individuals",fill="Type")
+
+
+#Contact Sports Onset
+Q2<-complete.cases(ALS[,c("Contact","Onset")])
+ALS.CC2<-ALS[Q2,]
+table(ALS.CC2$Onset)
+
+ggplot(data=ALS.CC2, aes(ALS.CC2$Contact))+
+  geom_bar(aes(fill=as.factor(Onset), y = (..count..)/sum(..count..)), position="dodge") +
+  scale_y_continuous(labels=percent,limits=c(0,0.9))+theme_classic()+labs(title ="Onset Contact Sports", x = "Contact Sports", y = "Percentage of individuals",fill="Onset")
+table(Contact,Onset)
+
+#Onset Total
+Q2<-complete.cases(ALS[,c("Onset")])
+ggplot(data=ALS.CC2, aes(x = Onset,fill=Onset)) +
+  geom_bar(aes( y = (..count..)/sum(..count..))) +
+  scale_y_continuous(labels = percent_format(), limits=c(0,0.9)) +theme_classic()+
+  labs(title = "Onset", x = "Onset", y = "Percentage of individuals")
+
+#SOD1 Total
+Q2<-complete.cases(ALS[,c("SOD1")])
+ALS.CC2<-ALS[Q2,]
+ggplot(data=ALS.CC2, aes(x = SOD1,fill=SOD1)) +
+  geom_bar(aes( y = (..count..)/sum(..count..))) +
+  scale_y_continuous(labels = percent_format(), limits=c(0,1)) +theme_classic()+
+  labs(title = "SOD1 mutation", x = "SOD1 mutation", y = "Percentage of individuals")
+
+#C9orf72 Total
+ggplot(data=subset(ALS,C9!="NA"), aes(x = C9,fill=C9)) +
+  geom_bar(aes( y = (..count..)/sum(..count..))) +
+  scale_y_continuous(labels = percent_format(), limits=c(0,1)) +theme_classic()+
+  labs(title = "Abnormal C9orf72", x = "Abnormal C9orf72", y = "Percentage of individuals")
+
+
+#Progression Group
+P.G<-ALS$P.G
+Q2<-complete.cases(ALS[,c("P.G")])
+ALS.CC2<-ALS[Q2,]
+
+ggplot(ALS.CC2, aes(x = P.G,fill=P.G)) +
+  geom_bar(aes( y = (..count..)/sum(..count..))) +
+  scale_y_continuous(labels = percent_format(), limits=c(0,0.6)) +theme_classic()+
+  labs(title = "Progression Groups", x = "Progression Group", y = "Percentage of individuals")
+
+
+# Progression Group 
+Q2<-complete.cases(ALS[,c("P.G","Onset")])
+ALS.CC2<-ALS[Q2,]
+
+ggplot(ALS.CC2, aes(x = P.G,fill=P.G)) +
+  geom_bar(aes( y = (..count..)/sum(..count..))) +
+  scale_y_continuous(labels = percent_format(), limits=c(0,0.6)) +theme_classic()+
+  labs(title = "Progression Groups", x = "Progression Group", y = "Percentage of individuals")
+
+# Progression Group and Onset
+
+Q2<-complete.cases(ALS[,c("Onset","P.G")])
+ALS.CC2<-ALS[Q2,]
+
+ggplot(ALS.CC2, aes(P.G, group = Onset)) +
+  geom_bar(aes(y = ..prop.., fill = factor(Onset)), stat="count",position = "dodge") +
+  scale_y_continuous(labels=scales::percent) +theme_classic()+labs(title ="Progression Group by onset", x = "Progression Group", y = "Relative frequencies",fill="Onset")
+
+#Histogram Rate-of-Decay T
+qplot(ALS$ALSFRS.R.T,geom = "histogram")
+
+qplot(ALS$ALSFRS.R,geom="histogram")
+
+qplot(ALS$Diagnostic.delay,geom="histogram")
+
+ggplot(ALS, aes(x=Gender, y=ALS$ALSFRS.R, color=Gender)) +
+  geom_boxplot()+theme(panel.background = element_rect(fill = "white"))
+
+ggplot(ALS, aes(x=Gender, y=ALS$ALSFRS.R)) +
+  geom_boxplot(aes(fill=Gender))+theme(panel.background = element_rect(fill = "white"),legend.text = element_text(size = 20),legend.title = element_text(size = 20),title = element_text(size = 20),strip.text.x = element_text(size = 20))+labs( y = "ALSFRS.R",fill="Gender")
+
+#Boxplot Idade
+boxplot(ALS$Age,col="light blue",ylab="Age in years")
+
+#Boxplot ALSFRS:R
+boxplot(ALS$ALSFRS.R ~ ALS$Type, data =subset(ALS,Type==1),
+        xlab = "Type", ylab = "Age in years",
+        frame = FALSE, col = c("lightblue", "pink"))
+
+Q2<-complete.cases(ALS[,c("Gender","ALSFRS.R")])
+ALS.CC2<-ALS[Q2,]
+
+ggplot(ALS.CC2, aes(x=Gender, y=ALSFRS.R)) +
+  geom_boxplot(aes(fill=Gender))+theme(panel.background = element_rect(fill = "white"))+labs( y = "ALSFRS.R",fill="Gender")#+facet_wrap(~Gender)
+
+Q2<-complete.cases(ALS[,c("Diagnostic.delay","Onset")])
+ALS.CC2<-ALS[Q2,]
+ggplot(ALS.CC2, aes(x=Type, y=TE)) +
+  geom_boxplot(aes(fill=Smoking))+theme(panel.background = element_rect(fill = "white"),axis.text=element_text(size=12))
+
+Q2<-complete.cases(ALS[,c("Onset","Age.1st.Sym")])
+ALS.CC2<-ALS[Q2,]
+
+ggplot(ALS.CC2, aes(x=Gender, y=ALSFRS.R)) +
+  geom_boxplot(aes(fill=Gender))+theme(panel.background = element_rect(fill = "white"),axis.text=element_text(size=20),
+                                       axis.title=element_text(size=20),axis.line = element_line(color="black"),legend.text = element_text(size = 20),legend.title = element_text(size = 20),title = element_text(size = 20),strip.text.x = element_text(size = 20))+labs( y = "ALSFRS.R",fill="Gender")#+facet_wrap(~Gender)
+ggplot(ALS.CC2, aes(x=Type, y=TE)) +
+  geom_boxplot(aes(fill=TE))+theme(panel.background = element_rect(fill = "white"),axis.text=element_text(size=20),
+                                   axis.title=element_text(size=20),axis.line = element_line(color="black"),legend.text = element_text(size = 20),legend.title = element_text(size = 20),title = element_text(size = 20),strip.text.x = element_text(size = 20))+labs( y = "TE (packs-per-year)",fill="Type")
+Fe<- ALS[which(ALS$Gender=='Female'),]
+which(Fe$Type=='Patients') #[1:558]
+which(Fe$Type=='Controls') #[559:1049]
+
+length(which(Fe$Age<30))
+
+mean(na.omit(Fe[1:558,]$Age)) #63.5 média  pacientes
+mean(na.omit(Fe[559:1049,]$Age)) # 55.1 média  controlos
+
+median(na.omit(Fe[1:558,]$Age)) #65.3 mediana  P
+median(na.omit(Fe[559:1049,]$Age))  #56 mediana C
+
+sd(na.omit(Fe[1:558,]$Age)) #12.8 P
+sd(na.omit(Fe[559:1049,]$Age))  # 15.2 C
+
+max(na.omit(Fe[1:558,]$Age)) #89.8 P
+max(na.omit(Fe[559:1049,]$Age)) #91.4
+
+min(na.omit(Fe[1:558,]$Age)) #20.7
+min(na.omit(Fe[559:1049,]$Age)) #19.1
+
+G<- ALS[which(ALS$Gender=='Male'),]
+which(G$Type=='Patients') #[1:768]
+which(G$Type=='Controls') #[769:1198]
+
+mean(na.omit(G[1:768,]$Age)) #60.7 média  pacientes
+mean(na.omit(G[769:1198,]$Age)) # 57 média  controlos
+
+median(na.omit(G[1:768,]$Age)) #61.7 mediana  P
+median(na.omit(G[769:1198,]$Age))#59.3 mediana C
+
+sd(na.omit(G[1:768,]$Age)) #12.8 P
+sd(na.omit(G[769:1198,]$Age))  # 15 C
+
+max(na.omit(G[1:768,]$Age)) #89.4 P
+max(na.omit(G[769:1198,]$Age)) #86.6
+
+min(na.omit(G[1:768,]$Age)) #17
+min(na.omit(G[769:1198,]$Age)) #12
+
+ggplot(ALS.CC2, aes(x=Gender, y=Age.1st.sym)) +
+  +   geom_boxplot(aes(fill = Gender))+theme_classic()
+
+#Boxplot Progression group
+Q2<-complete.cases(ALS[,c("ALSFRS.R","Gender")])
+ALS.CC2<-ALS[Q2,]
+table(ALS$P.G)
+ggplot(ALS.CC2, aes(x=Gender, y=ALSFRS.R)) +
+  geom_boxplot(aes(fill = Gender))+theme_classic()
+
+table(ALS$P.G)
+FA<-ALS.CC2[which(ALS.CC2$P.G=='Fast'),]
+
+mean(na.omit(FA$ALSFRS.R))#2.822192
+median(na.omit(FA$ALSFRS.R)) #2.19
+sd(na.omit(FA$ALSFRS.R))#1.552176
+max(na.omit(FA$ALSFRS.R)) #11.91
+min(na.omit(FA$ALSFRS.R)) #1.5
+
+
+S<-ALS.CC2[which(ALS.CC2$P.G=='Slow'),]
+
+mean(na.omit(S$ALSFRS.R))#0.277
+median(na.omit(S$ALSFRS.R)) #0.24997
+sd(na.omit(S$ALSFRS.R))
+max(na.omit(S$ALSFRS.R)) #0.499
+min(na.omit(S$ALSFRS.R)) #0
+
+N<-ALS.CC2[which(ALS.CC2$P.G=='Neutral'),]
+
+mean(na.omit(N$ALSFRS.R))#0.84
+median(na.omit(N$ALSFRS.R)) #0.79
+sd(na.omit(N$ALSFRS.R))#0.2551085
+max(na.omit(N$ALSFRS.R)) #1.49
+min(na.omit(N$ALSFRS.R)) #0.5
+
+
+
+#Boxplot Progression Group
+
+ggplot(ALS.CC2, aes(x=P.G, y=ALS.CC2$ALSFRS.R)) +
+  geom_boxplot(aes(fill=P.G))+theme(panel.background = element_rect(fill = "white"),axis.text=element_text(size=20),
+                                    axis.title=element_text(size=20),axis.line = element_line(color="black"),legend.text = element_text(size = 20),legend.title = element_text(size = 20),title = element_text(size = 20),strip.text.x = element_text(size = 20))+labs( y = "ALSFRS.R")
+
+mean(na.omit(ALS[1:1326,]$TE)) #10.43118
+mean(na.omit(ALS[1327:2247,]$TE))  #8.620692
+
+median(na.omit(ALS[1:1326,]$TE)) #0
+median(na.omit(ALS[1327:2247,]$TE))  #0
+
+sd(na.omit(ALS[1:1326,]$TE)) #20.15537
+sd(na.omit(ALS[1327:2247,]$TE))  # 17.17877
+
+max(na.omit(ALS[1:1326,]$TE)) #174
+max(na.omit(ALS[1327:2247,]$TE)) #123
+
+min(na.omit(ALS[1:1326,]$TE)) #0
+min(na.omit(ALS[1327:2247,]$TE)) #0
+
+S <- ALS[which(ALS$Smoking=='Smoking'),]
+S<-S[-c(56,218,264),]
+
+
+mean(na.omit(S[1:170,]$TE)) #29.12 média fumadores pacientes
+mean(na.omit(S[171:319,]$TE)) # 31.57 média fumadores controlos
+
+median(na.omit(S[1:170,]$TE)) #24.5 mediana fumadores P
+median(na.omit(S[171:319,]$TE))  #29 mediana fumadores C
+
+sd(na.omit(S[1:170,]$TE)) #19.1 P
+sd(na.omit(S[171:319,]$TE))  # 22.5 C
+
+max(na.omit(S[1:170,]$TE)) #116 P
+max(na.omit(S[171:319,]$TE)) #100 C
+
+min(na.omit(S[1:170,]$TE)) #1.65
+min(na.omit(S[171:319,]$TE)) #0.1
+
+which(S$TE==0)
+
+SE <- ALS[ which(ALS$Smoking=="Ex-smoking")]
+
+
+mean(na.omit(SE[1:402,]$TE)) #26.69 média fumadores pacientes
+mean(na.omit(SE[403:634,]$TE)) # 21.047 média fumadores controlos
+
+median(na.omit(SE[1:402,]$TE)) #20 mediana fumadores P
+median(na.omit(SE[403:634,]$TE))  #15 mediana fumadores C
+
+sd(na.omit(SE[1:402,]$TE)) #26.257 P
+sd(na.omit(SE[403:634,]$TE))  # 19.638 C
+
+max(na.omit(SE[1:402,]$TE)) #174 P
+max(na.omit(SE[403:634,]$TE)) #123 C
+
+min(na.omit(SE[1:402,]$TE)) #0.05
+min(na.omit(SE[403:634,]$TE)) #0.1
+
+#Boxplot Idade de 1ª manifestação
+ALS$Diagnostic.delayY<-ALS$Diagnostic.delay*0.08333
+
+Q2<-complete.cases(ALS[,c("Diagnostic.delayY","Onset","Gender")])
+ALS.CC2<-ALS[Q2,]
+
+which(ALS$Diagnostic.delayY>15) #139  263  474 1192 1258 1279
+
+
+
+ggplot(ALS.CC2, aes(x=Onset, y=Diagnostic.delayY)) +
+  geom_boxplot(aes(fill=Onset))+
+  labs(x="Onset", y = "Diagnostic delay (years)")+theme(panel.background = element_rect(fill = "white"),axis.text=element_text(size=20),
+                                                        axis.title=element_text(size=20),axis.line = element_line(color="black"),legend.text = element_text(size = 20),legend.title = element_text(size = 20),title = element_text(size = 20),strip.text.x = element_text(size = 20))
+which(ALS.CC2$Diagnostic.delayY<=5)
+
+
+ggplot(ALS.CC2[which(ALS.CC2$Diagnostic.delayY<=5),], aes(x=Onset, y=Diagnostic.delayY)) +
+  geom_boxplot(aes(fill=Onset))+
+  labs(x="Onset", y = "Diagnostic delay (years)")+theme(panel.background = element_rect(fill = "white"),axis.text=element_text(size=20),
+                                                        axis.title=element_text(size=20),axis.line = element_line(color="black"),legend.text = element_text(size = 20),legend.title = element_text(size = 20),title = element_text(size = 20),strip.text.x = element_text(size = 20))
+
+ALS.CC2[ which(ALS.CC2$Onset=="Limbs")]
+
+mean(L$Diagnostic.delayY)#1.679
+median(na.omit(L$Diagnostic.delayY))#0.91442
+sd(na.omit(L$Diagnostic.delayY))# 1.938342
+max(na.omit(L$Diagnostic.delayY))# 25
+max(na.omit(L$Diagnostic.delayY))#22.15973(verificar, corresponde ao individuo 1192)
+min(na.omit(ALS$Diagnostic.delayY))#0
+
+which(ALS$Diagnostic.delayY==0) #39  139  217  263  307  474  651  833  965 1192 1222 1258 1279
+
+
+B<- ALS.CC2[ which(ALS.CC2$Onset=="Bulbar")]
+
+mean(na.omit(B$Diagnostic.delayY))#0.92318
+median(na.omit(B$Diagnostic.delayY))#0.9773937
+sd(na.omit(B$Diagnostic.delayY))# 1.938342
+max(na.omit(B$Diagnostic.delayY))# 22.15973
+max(na.omit(B$Diagnostic.delayY))#14.8305(verificar, corresponde ao individuo 1192)
+min(na.omit(B$Diagnostic.delayY))# 0.01642678
+
+
+######
+B <- ALS[ which(ALS.CC2$Gender=="Female"),]
+B1<-B[which(B$Onset=="Limbs"),]
+B2<-B[which(B$Onset=="Bulbar"),]
+
+mean(na.omit(B1$Age.1st.Sym))#57.8
+mean(na.omit(B2$Age.1st.Sym))#64.5
+
+median(na.omit(B1$Age.1st.Sym))#59.16
+median(na.omit(B2$Age.1st.Sym))#65.36
+
+sd(na.omit(B1$Age.1st.Sym))#13.1
+sd(na.omit(B2$Age.1st.Sym))#10.9
+
+max(na.omit(B1$Age.1st.Sym))#87.1
+max(na.omit(B2$Age.1st.Sym))#84.51
+
+min(na.omit(B1$Age.1st.Sym))#13.965
+min(na.omit(B2$Age.1st.Sym))#24.59
+
+B <- ALS[ which(ALS.CC2$Gender=="Male"),]
+B1<-B[which(B$Onset=="Limbs"),]
+B2<-B[which(B$Onset=="Bulbar"),]
+
+mean(na.omit(B1$Age.1st.Sym))#57.8
+mean(na.omit(B2$Age.1st.Sym))#64.46
+
+median(na.omit(B1$Age.1st.Sym))#57.7
+median(na.omit(B2$Age.1st.Sym))#64.48
+
+sd(na.omit(B1$Age.1st.Sym))#14.6
+sd(na.omit(B2$Age.1st.Sym))#11.1
+
+max(na.omit(B1$Age.1st.Sym))#88.39
+max(na.omit(B2$Age.1st.Sym))#89.18
+
+min(na.omit(B1$Age.1st.Sym))#13.95
+min(na.omit(B2$Age.1st.Sym))#24.59
+
+#Histograma diagnóstico deelay
+
+qplot(ALS$Diagnostic.delay,
+      geom="histogram",
+      binwidth = 0.5,
+      main = "Histogram for Diagnostic delay",
+      xlab = "Diagnostic delay (months)",
+      fill=I("blue"),
+      col=I("pink"),
+      alpha=I(.2),
+      xlim=c(0,300))
+
+#Histogram Rate of decay
+
+qplot(ALS$ALSFRS.R,
+      geom="histogram",
+      binwidth = 0.5,
+      main = "Histogram for ALSFRS.R",
+      xlab = "ALSFRS.R",
+      fill=I("blue"),
+      col=I("pink"),
+      alpha=I(.2),
+      xlim=c(0,12))
+
+Q2<-complete.cases(ALS[,c("P.G","Onset")])
+ALS.CC2<-ALS[Q2,]
+
+min(na.omit(ALS$ALSFRS.R))
+max(na.omit(ALS$ALSFRS.R))
+
+#################################
+####Gráfico hábitos tabágicos###
+#################################
+library(readxl)
+GRa <- read_excel("/Users/ritahenriquesepidoc/Desktop/Tese/GRa.xlsx")
+head(GRa)
+data<-GRa
+dim(data)
+names(data)<-c("inicio","fim","inicio1", "fim1")
+data<-data[complete.cases(data),]
+data<-data[order(data$fim),]
+n<-nrow(data)
+
+
+li<-min(data$inicio);li
+ls<-max(data$fim);ls
+plot(c(li,ls),c(1,n),type="n",ylab = "ID",xlab = "Smoking Days")
+for(i in 1:n)
+  segments(data$inicio[i],i,data$fim[i],i,col="grey")
+abline(v=0,col=2)
+
+summary(data$inicio)
+
+#Em anos
+
+data<-data[complete.cases(data),]
+data<-data[order(data$fim1),]
+n<-nrow(data)
+
+lia<-min(data$inicio1);lia
+lsa<-max(data$fim1);lsa
+plot(c(lia,lsa),c(1,n),type="n",ylab = "ID",xlab = "Smoking Years")#),cex.main=2, cex.lab=2, cex.axis=2,cex.id = 1.5,cex.caption =2 )
+axis(side=1, at=seq(-60, 10, by=10))
+for(i in 1:n)
+  segments(data$inicio1[i],i,data$fim1[i],i,col="grey")
+abline(v=0,col=2)
+dev.print(pdf, "image.pdf")
+
+#Corte
+data<-data[complete.cases(data),]
+data<-data[order(data$fim1),]
+n<-nrow(data)
+
+lia<-min(data$inicio1);lia
+lsa<-max(data$fim1);lsa
+plot(c(lia,lsa),c(1,n),type="n",ylab = "ID",xlab = "Smoking Years",xlim=c(-10,10) )
+axis(side=1, at=seq(-60, 10, by=5))
+for(i in 1:n)
+  segments(data$inicio1[i],i,data$fim1[i],i,col="grey")
+abline(v=0,col=2)
+dev.print(pdf, "image2.pdf")
+
+
+
+summary(data$inicio1)
+summary(data$fim1)
+View(data)
+
+
+##################
+# Chi-square Test#
+##################
+#TYpe-Gender
+
+G<-chisq.test(Type,Gender);G
+G$observed
+G$expected
+
+#Type-Smoking
+S<-chisq.test(Type,ALS$Smoking);S
+S$observed
+S$expected
+
+#Type- Regular PE
+
+R<-chisq.test(Type,ALS$R.PE);R
+R$observed
+R$expected
+
+#Type- PE
+
+P<-chisq.test(Type,ALS$PE);P
+P$observed
+P$expected
+
+#Type-Contact
+
+H<-chisq.test(Type,ALS$Contact);H
+H$observed
+H$expected
+
+
+### Onset
+
+#Onset-Gender
+
+Go<-chisq.test(Onset,Gender);Go
+Go$observed
+Go$expected
+
+
+#Onset-Smoking
+So<-chisq.test(Onset,ALS$Smoking);So
+So$observed
+So$expected
+
+#Onset-Regular PE
+
+Ro<-chisq.test(Onset,ALS$R.PE);Ro
+Ro$observed
+Ro$expected
+
+#Onset- PE
+
+Po<-chisq.test(Onset,ALS$PE);Po
+Po$observed
+Po$expected
+
+#Onset-Contact
+
+Ho<-chisq.test(Onset,ALS$Contact);Ho
+Ho$observed
+Ho$expected
+
+#Modelos univariados
+
+#Age
+m.Age <-glm(Type~Age,family = binomial, data = ALS)
+summary(m.Age)
+waldtest(m.Age,test="Chisq")
+anova(m.Age,test="Chisq")
+confint.default(m.Age)
+exp(confint(m.Age))
+
+
+###Avaliar Logit
+data.ALS<-ALS[order(ALS$Age),]
+
+
+qnt <- quantile(data.ALS$Age, probs=seq(0, 1, 0.25),na.rm = T) # calcular os quantis para a variável Age
+groups <- cut(data.ALS$Age, breaks=qnt[1:5], include.lowest=TRUE, labels=FALSE) # criar indice de grupo de acordo com o quantil
+data.ALS <- cbind(data.ALS, groups) # adicionar a coluna com o grupo aos dados, ordenados pela variável Age
+mid.points <- qnt[-length(qnt)] + diff(qnt)/2 # calcular o ponto médio para cada slot
+
+View(data.ALS)
+
+length(which(groups==1 & data.ALS$Type=="Patients")) #251 pacientes no grupo 1
+length(which(groups==1 & data.ALS$Type=="Controls")) #311 controlos no grupo 1
+
+length(which(groups==2 & data.ALS$Type=="Patients")) #330 pacientes no grupo 2
+length(which(groups==2 & data.ALS$Type=="Controls")) #231 pacienes no grupo 2
+
+length(which(groups==3 & data.ALS$Type=="Patients")) #352 pacientes no grupo 3
+length(which(groups==3 & data.ALS$Type=="Controls")) #209 pacienes no grupo 3
+
+length(which(groups==4 & data.ALS$Type=="Patients")) #392 pacientes no grupo 4
+length(which(groups==4 & data.ALS$Type=="Controls")) #170 pacienes no grupo 4
+
+#Calular a proprção de sucessos para cada grupo e calcular o logit
+
+##Grupo 1
+prop.suc1<-length(which(groups==1 & data.ALS$Type=="Patients"))/length(which(groups==1)) # nºde sucessos/dim grupo
+
+###logit
+logit.suc1<-log(prop.suc1/(1-prop.suc1))
+
+##Grupo 2
+prop.suc2<-length(which(groups==2 & data.ALS$Type=="Patients"))/length(which(groups==2)) # nºde sucessos/dim grupo
+
+###logit
+logit.suc2<-log(prop.suc2/(1-prop.suc2))
+
+##Grupo 3
+prop.suc3<-length(which(groups==3 & data.ALS$Type=="Patients"))/length(which(groups==3)) # nºde sucessos/dim grupo
+
+###logit
+logit.suc3<-log(prop.suc3/(1-prop.suc3))
+
+##Grupo 4
+prop.suc4<-length(which(groups==4 & data.ALS$Type=="Patients"))/length(which(groups==4)) # nºde sucessos/dim grupo
+
+###logit
+logit.suc4<-log(prop.suc4/(1-prop.suc4))
+
+
+logit.suc <- c(logit.suc1,logit.suc2,logit.suc3,logit.suc4)
+# Fazer o gráfico respectivo (midpoints no eixo dos x, logit no eixo do y)
+par(pty="s")
+plot(mid.points, logit.suc,
+     type='n', las=1, ylab="logit Age", xlab="midpoint Age", cex.lab=1.2, cex.axis=1.2)
+points(mid.points, logit.suc, pch=16, cex=1.2, col=1)
+abline(lm(logit.suc ~ mid.points), lty=2)
+mod <- lm(logit.suc ~ mid.points)
+coef(mod)
+grid(col = "lightgray")
+par(pty="m")
+
+
+#Idade categorizada
+
+#Criar variável com idade categorizada
+
+
+agebreaks <- c(0,55,95)
+agelabels <- c("<55",">55")
+setDT(ALS)[ , agegroups := cut(Age,
+                               breaks = agebreaks,
+                               right = FALSE,
+                               labels = agelabels)]
+
+m.AgeC<-glm(Type~ALS$agegroups,family=binomial, data=ALS)
+summary(m.AgeC)
+exp(m.AgeC$coefficients)
+exp(confint(m.AgeC))
+
+#Gender
+m.Gender<-glm(Type~Gender,family = binomial,data =ALS)
+summary(m.Gender)
+waldtest(m.Gender,test="Chisq")
+anova(m.Gender,test="Chisq")
+exp(m.Gender$coefficients)
+exp(confint(m.Gender))
+
+#Smoking
+m.Smoking<-glm(Type~Smoking,family=binomial,data=ALS)
+summary(m.Smoking)
+waldtest(m.Smoking)
+anova(m.Smoking,test="Chisq")
+exp(m.Smoking$coefficients)
+exp(confint(m.Smoking))
+
+# Tobacco exposição
+m.TE<-glm(Type~TE,family=binomial,data =ALS)
+summary(m.TE)
+anova(m.TE,test="Chisq")
+exp(m.TE$coefficients)
+exp(confint(m.TE))
+
+#### Avaliação do logit carga tabágica
+
+
+### Excluir os não fumadores
+
+
+ALS2<-ALS[which(ALS$Smoking=="Smoking"| ALS$Smoking=="Ex-Smoking"),]
+
+z<-complete.cases(ALS2[,c("TE","Type")])
+ALS2<-ALS2[z,]
+
+data.ALS2<-ALS2[order(ALS2$TE),]
+
+
+qnt <- quantile(data.ALS2$TE, probs=seq(0, 1, 0.25),na.rm = T) # calcular os quantis para a variável TE
+groups <- cut(data.ALS2$TE, breaks=qnt[1:5], include.lowest=TRUE, labels=FALSE) # criar indice de grupo de acordo com o quantil
+data.ALS2 <- cbind(data.ALS2, groups) # adicionar a coluna com o grupo aos dados, ordenados pela variável Age
+mid.points <- qnt[-length(qnt)] + diff(qnt)/2 # calcular o ponto médio para cada slot
+
+
+length(which(groups==1 & data.ALS2$Type=="Patients")) #123 pacientes no grupo 1
+length(which(groups==1 & data.ALS2$Type=="Controls")) #92 controlos no grupo 1
+
+length(which(groups==2 & data.ALS2$Type=="Patients")) #101 pacientes no grupo 2
+length(which(groups==2 & data.ALS2$Type=="Controls")) #63 pacienes no grupo 2
+
+length(which(groups==3 & data.ALS2$Type=="Patients")) #113 pacientes no grupo 3
+length(which(groups==3 & data.ALS2$Type=="Controls")) #70 pacienes no grupo 3
+
+length(which(groups==4 & data.ALS2$Type=="Patients")) #117 pacientes no grupo 4
+length(which(groups==4 & data.ALS2$Type=="Controls")) #64 pacienes no grupo 4
+
+#Calular a proprção de sucessos para cada grupo e calcular o logit
+
+##Grupo 1
+prop.suc1<-length(which(groups==1 & data.ALS2$Type=="Patients"))/length(which(groups==1)) # nºde sucessos/dim grupo
+
+###logit
+logit.suc1<-log(prop.suc1/(1-prop.suc1))
+
+##Grupo 2
+prop.suc2<-length(which(groups==2 & data.ALS2$Type=="Patients"))/length(which(groups==2)) # nºde sucessos/dim grupo
+
+###logit
+logit.suc2<-log(prop.suc2/(1-prop.suc2))
+
+##Grupo 3
+prop.suc3<-length(which(groups==3 & data.ALS2$Type=="Patients"))/length(which(groups==3)) # nºde sucessos/dim grupo
+
+###logit
+logit.suc3<-log(prop.suc3/(1-prop.suc3))
+
+##Grupo 4
+prop.suc4<-length(which(groups==4 & data.ALS2$Type=="Patients"))/length(which(groups==4)) # nºde sucessos/dim grupo
+
+###logit
+logit.suc4<-log(prop.suc4/(1-prop.suc4))
+
+
+logit.suc <- c(logit.suc1,logit.suc2,logit.suc3,logit.suc4)
+
+# Fazer o gráfico respectivo (midpoints no eixo dos x, logit no eixo do y)
+par(pty="s")
+plot(mid.points, logit.suc,
+     type='n', las=1, ylab="logit TE", xlab="midpoint TE", cex.lab=1.2, cex.axis=1.2)
+points(mid.points, logit.suc, pch=16, cex=1.2, col=1)
+abline(lm(logit.suc ~ mid.points), lty=2)
+mod <- lm(logit.suc ~ mid.points)
+coef(mod)
+grid(col = "lightgray")
+par(pty="m")
+
+#TE Splines
+
+TEc<-glm(Type~rcs(TE,5), family=binomial,data=ALS)
+summary(TEc)
+
+anova(m.TE,TEc,test="Chisq")
+
+
+#TE categorizado
+TEbreaks <- c(0,20,40,180)
+TElabels <- c("<20","20-40",">=40")
+
+setDT(ALS)[ , TEgroups := cut(TE,
+                              breaks = TEbreaks,
+                              right = FALSE,
+                              labels = TElabels)]
+
+TEC<-glm(Type~ALS$TEgroups,family=binomial,data=ALS)
+summary(TEC)
+
+
+#Praticar ativiade física
+
+m.RPE<-glm(Type~ALS$R.PE,family=binomial,data=ALS)
+summary(m.RPE)
+waldtest(m.RPE)
+anova(m.RPE,test="Chisq")
+confint.default(m.RPE)
+C<-scale(ALS$Age, scale = FALSE)
+ALS$TEC<-scale(TE,scale=FALSE)
+
+
+
+tividade física modadalidade contacto- Modelo tipo 1
+
+m.Contact<-glm(Type~Contact,family=binomial,data=ALS)
+summary(m.Contact)
+
+anova(m.Contact,test="Chisq")
+exp(m.Contact$coefficients)
+exp(confint(m.Contact))
+
+###Modelo II- Com a interação Gender*Age*Contact
+z<-complete.cases(ALS[,c("TE","Age","Gender","Contact","Type","Smoking")])
+ALS1<-ALS[z,]
+library(rms)
+
+
+####Primeiro modelo todas as interações
+m2<-glm(Type~Contact*Gender*Age*TE,family=binomial,data=ALS1)
+summary(m2)
+
+
+### Dividir as interações duas a duas
+m2.A.1<-glm(Type~Contact*Gender+Contact*Age+Contact*TE+Contact*Gender,family=binomial,data=ALS1)
+summary(m2.A.1)
+confint(m2.A.1)
+exp(m2.A.1$coefficients)
+exp(confint(m2.A.1))
+anova(m2,m2.A.1,test="Chisq") #Modelo considerando a interação Gender Male*Te não é estatisticamente significativo
+
+### Retirar Gender*TE
+
+m2.A.2<-glm(Type~Contact*Gender+Contact*TE+Gender*Age+Age*TE+Contact*Age,family=binomial,data=ALS1)
+
+summary(m2.A.2)
+confint(m2.A.2)
+exp(confint(m2.A.2))
+
+### Retirar Age*Contact
+m2.A.3<-glm(Type~Contact*Gender+Contact*TE+Gender*Age+Age*TE,family=binomial,data=ALS1)
+summary(m2.A.3)
+confint(m2.A.3)
+exp(confint(m2.A.3))
+d<-m2.A.3$coefficients
+
+#Retirar TE*AGE
+m2.A.4<-glm(Type~Contact*Gender+Contact*TE+Gender*Age,family=binomial,data=ALS1)
+summary(m2.A.4)
+
+m2.A.4$coefficients
+summary(m2.A.4)
+range(na.omit(ALS$Age))
+quantile(na.omit(ALS$Age))
+stukel(m2.A.4)  
+
+
+#Retirar TE*AGE e Gender age
+
+m2.A.5<-glm(Type~Contact*Gender+Contact*TE+Age,family=binomial,data=ALS1)
+summary(m2.A.5)
+range(na.omit(ALS$Age))
+quantile(na.omit(ALS$Age))
+stukel(m2.A.5) 
+
+
+residualPlot(m2.A.4, variable = "fitted", type = "rstudent",xlab="Estimated logit values", ylab="Standardized Pearson Residuals",
+             plot = TRUE)
+
+influencePlot(m2.A.4,scale=10,xlab="Hat-Values", ylab="Standardized Pearson residuals", id=TRUE)
+
+plot_model(m2.A.4, show.values = TRUE, value.offset = .3,title = "Patients Vs Controls",show.intercept = T)
+
+plot(allEffects(m2.A.4))
+
+anova(m2.A.2,m2.A.1,test="Chisq") #0.3867- Os modelos não diferem, podemos retirar a interação Contact*Age
+allEffects(m2.A.3)
+summary(allEffects(m2.A.3))
+
+#########################################
+###Considerar só homens idade contínua###
+##########################################
+ALS2<-ALS[which(ALS$Gender=="Male"),]
+
+
+mH<-glm(Type~Contact*Age*TE,family=binomial,data=ALS2)
+summary(mH)
+
+mH1<-glm(Type~Contact*Age+Contact*TE+Age*TE,family = binomial,data=ALS2)
+summary(mH1)
+
+anova(mH,mH1,test="Chisq")# Os modelos não diferem significativamente, podemos ficar com o modelo mH1
+
+mH2<-glm(Type~Contact*TE+Age*TE,family=binomial,data=ALS2)
+summary(mH2)
+exp(mH2$coefficients)
+exp(confint(mH2))
+
+
+mH2L<-glm(Type~Contact*TE+Age,family=binomial,data=ALS2)
+summary(mH2L)
+exp(mH2L$coefficients)
+exp(confint(mH2L))
+
+residualPlot(mH2L, variable = "fitted", type = "rstudent",xlab="Estimated logit values", ylab="Standardized Pearson Residuals",
+             plot = TRUE)
+
+influencePlot(mH2L,scale=10,xlab="Hat-Values", ylab="Standardized Pearson residuals", id=TRUE)
+
+stukel(mH2L)
+
+
+plot_model(mH2L, show.values = TRUE, value.offset = .3,title = "Patients Vs Controls",show.intercept = T)
+
+#######################
+### Modelo com Smoking#
+#######################
+
+z<-complete.cases(ALS[,c("TE","Age","Gender","Contact","Type","Smoking")])
+ALS1<-ALS[z,]
+
+mS<-glm(Type~Contact+Gender+Age+Smoking,family=binomial,data=ALS1) 
+summary(mS)
+
+exp(mS$coefficients)
+exp(confint(mS))
+
+#No entanto vamos verifcar se considerando a interação (Contact*Smoking), esta é significativa
+
+mS1<-glm(Type~Contact*Gender+Contact*Age+Contact*Smoking,family=binomial,data=ALS1)
+
+summary(mS1)
+exp(mS1$coefficients)
+exp(confint(mS1))
+
+# Sem Interação Contact*Age
+mS2<-glm(Type~Contact*Gender+Contact*Smoking+Age,family=binomial,data=ALS1)
+summary(mS2)
+
+exp(mS2$coefficients)
+exp(confint(mS2))
+
+anova(mS1,mS2,test="Chisq")
+
+#Sem a interação Age*Contact
+
+mS3<-glm(Type~Contact*Gender+Age,family=binomial,data=ALS1)
+summary(mS3)
+
+exp(mS3$coefficients)
+exp(confint(mS3))
+
+anova(mS2,mS3,test="Chisq")
+
+
+###
+mS4<-glm(Type~Contact+Gender+Age+Contact*Gender,family=binomial,data=ALS1[-246,]) 
+summary(mS4)
+
+exp(mS4$coefficients)
+exp(confint(mS4))
+
+residualPlot(mS4, variable = "fitted", type = "rstudent",xlab="Estimated logit values", ylab="Standardized Pearson Residuals",
+             plot = TRUE)
+
+influencePlot(mS4,scale=10,xlab="Hat-Values", ylab="Standardized Pearson residuals", id=TRUE)
+
+stukel(mS4)
+
+
+### Considerar exclusivamente população Masculina
+
+ALS2<-ALS[which(ALS$Gender=="Male"),]
+z<-complete.cases(ALS2[,c("TE","Age","Gender","Contact","Type","Smoking")])
+ALS2<-ALS2[z,]
+
+### Modelo com Smoking
+
+mS<-glm(Type~Contact+Age+Smoking,family=binomial,data=ALS2) 
+summary(mS)
+
+exp(mS$coefficients)
+exp(confint(mS))
+
+##Modelo com as interações
+
+mS1<-glm(Type~Contact*Age+Contact*Smoking,family=binomial,data=ALS2) 
+summary(mS1) #Nenhuma das interações é significativa
+
+exp(mS1$coefficients)
+exp(confint(mS1))
+
+##Remover a interação Contact
+mS3<-glm(Type~Age+Contact*Smoking,family=binomial,data=ALS2) 
+summary(mS3) #Nenhuma das interações é significativa
+
+exp(mS3$coefficients)
+exp(confint(mS3))
+
+anova(mS1,mS3, test = "Chisq")
+
+residualPlot(mS3, variable = "fitted", type = "rstudent",xlab="Estimated logit values", ylab="Standardized Pearson Residuals",
+             plot = TRUE)
+
+influencePlot(mS3,scale=10,xlab="Hat-Values", ylab="Standardized Pearson residuals", id=TRUE)
+
+stukel(mS3)
+
+mS4<-glm(Type~Age+Contact*Smoking,family=binomial,data=ALS2[-999,]) 
+summary(mS4) 
+## Ver o nº de fumadores por tipo e praticante ou não praticante
+table(ALS2$Smoking,ALS2$Type,ALS2$Contact)
+
+#Considera apenas o modelo Contact, Age
+
+mS2<-glm(Type~Contact+Age,family=binomial,data=ALS2) 
+summary(mS2) 
+
+exp(mS2$coefficients)
+exp(confint(mS2))
+
+### Recodificar smoking 
+
+#Considerar os Ex-Fumadores como Fumadores
+
+ALS$Smoking1<-ALS$Smoking
+
+levels(ALS$Smoking1)[2:3]<-("Smoking")
+Smoking1<-ALS$Smoking1
+table(Smoking1)
+
+z<-complete.cases(ALS[,c("TE","Age","Gender","Contact","Type","Smoking")])
+ALS1<-ALS[z,]
+
+
+mS<-glm(Type~Contact+Gender+Age+Smoking1,family=binomial,data=ALS1) # Hábito de fumo não é significativo
+summary(mS)
+
+exp(mS$coefficients)
+exp(confint(mS))
+
+#Avaliar as interações
+
+mS1<-glm(Type~Contact+Gender+Age+Smoking1+Contact*Gender+Contact*Age+Contact*Smoking1,family=binomial,data=ALS1) # Hábito de fumo não é significativo
+summary(mS1)
+
+exp(mS1$coefficients)
+exp(confint(mS1))
+
+#Remover a interação Contact:Age
+
+mS2<-glm(Type~Contact+Gender+Age+Smoking1+Contact*Gender+Contact*Smoking1,family=binomial,data=ALS1) # Hábito de fumo não é significativo
+summary(mS2)
+
+exp(mS2$coefficients)
+exp(confint(mS2))
+
+anova(mS1,mS2, test="Chisq")
+
+# Remover a interação Contact:Smoking
+
+mS3<-glm(Type~Contact+Gender+Age+Contact*Gender,family=binomial,data=ALS1) # Hábito de fumo não é significativo
+summary(mS3)
+
+exp(mS3$coefficients)
+exp(confint(mS3))
+
+anova(mS3,mS2, test="Chisq")
+
+residualPlot(mS3, variable = "fitted", type = "rstudent",xlab="Estimated logit values", ylab="Standardized Pearson Residuals",
+             plot = TRUE)
+
+influencePlot(mS3,scale=10,xlab="Hat-Values", ylab="Standardized Pearson residuals", id=TRUE)
+
+stukel(mS3)
+
+### Só população masculina
+
+ALS2<-ALS[which(ALS$Gender=="Male"),]
+z<-complete.cases(ALS2[,c("TE","Age","Gender","Contact","Type","Smoking")])
+ALS2<-ALS2[z,]
+### Modelo com Smoking
+
+mS1<-glm(Type~Contact+Age+Smoking1,family=binomial,data=ALS2) 
+summary(mS1)
+
+exp(mS1$coefficients)
+exp(confint(mS1))
+
+##Modelo com as interações
+
+mS1<-glm(Type~Contact*Age+Contact*Smoking1,family=binomial,data=ALS2) 
+summary(mS1) #Nenhuma das interações é significativa
+
+exp(mS1$coefficients)
+exp(confint(mS1))
+
+##Remover a interação Contact:Age
+
+mS2<-glm(Type~Contact+Age+Contact*Smoking1,family=binomial,data=ALS2[-958,]) 
+summary(mS2) 
+
+exp(mS2$coefficients)
+exp(confint(mS2))
+
+anova(mS1,mS2, test="Chisq")
+
+residualPlot(mS2, variable = "fitted", type = "rstudent",xlab="Estimated logit values", ylab="Standardized Pearson Residuals",
+             plot = TRUE)
+
+influencePlot(mS2,scale=10,xlab="Hat-Values", ylab="Standardized Pearson residuals", id=TRUE)
+
+stukel(mS2)
+
+
+
+### Utilizar a carga tabágica
+
+###Categorizar
+
+
+ALS$TE1<-ALS$TE
+
+ALS$TE1[ALS$TE<14.99] <- 1
+
+ALS$TE1[ALS$TE>=15] <- 2
+
+table(ALS$TE1)
+
+ALS$TE1[11<=ALS$TE & ALS$TE<=38] <- 3
+
+ALS$TE1[39<=ALS$TE & ALS$TE<=174] <- 4
+
+ALS$TE1[c(345,1321,375,1052,1584,1743)]<-3
+
+ALS$TE1<-factor(ALS$TE1)
+levels(ALS$TE1)<-c("Null","Low","Medium","High")
+
+table (ALS$TE1)
+
+z<-complete.cases(ALS[,c("TE","Age","Gender","Contact","Type")])
+ALS1<-ALS[z,]
+
+### Modelo com carga tabágica 
+
+mT<-glm(Type~Contact+Gender+Age+TE,family=binomial,data=ALS) 
+summary(mT)
+
+exp(mT$coefficients)
+exp(confint(mT))
+
+##Modelo com interações
+
+mT1<-glm(Type~Contact+Gender+Age+TE+Contact*Gender+Contact*Age+Contact*TE,family=binomial,data=ALS1) 
+summary(mT1)
+
+exp(mT1$coefficients)
+exp(confint(mT1))
+
+mT2<-glm(Type~Contact+Gender+Age+TE+Contact*Gender+Contact*TE,family=binomial,data=ALS1) 
+summary(mT2)
+
+exp(mT2$coefficients)
+exp(confint(mT2))
+
+anova(mT1,mT2, test="Chisq")
+
+#Remover a interação Contact:TE
+
+mT3<-glm(Type~Contact+Gender+Age+Contact*Gender,family=binomial,data=ALS1) 
+summary(mT3)
+
+exp(mT3$coefficients)
+exp(confint(mT3))
+
+anova(mT3,mT2, test="Chisq")
+
+
+## Só população masculina
+
+ALS2<-ALS[which(ALS$Gender=="Male"),]
+z<-complete.cases(ALS2[,c("TE1","Age","Contact","Type","Smoking")])
+ALS2<-ALS2[z,]
+
+mT1<-glm(Type~Contact+Age+TE,family=binomial,data=ALS2) 
+summary(mT1)
+
+exp(mT1$coefficients)
+exp(confint(mT1))
+
+###Modelo com interação
+
+mT2<-glm(Type~Contact+Age+TE+Contact*Age+Contact*TE,family=binomial,data=ALS2) 
+summary(mT2)
+
+exp(mT2$coefficients)
+exp(confint(mT2))
+
+
+#Modelo sem a interação Contact:Age
+
+###Modelo com interação
+
+mT3<-glm(Type~Contact+Age+Contact*TE,family=binomial,data=ALS2) 
+summary(mT3)
+
+exp(mT3$coefficients)
+exp(confint(mT3))
+
+anova(mT2,mT3, test="Chisq")
+
+table(ALS2$Type,ALS2$TE1,ALS2$Contact)
+stukel(mT3)
+
+residualPlot(fit1, variable = "fitted", type = "rstudent",xlab="Estimated logit values", ylab="Standardized Pearson Residuals",
+             plot = TRUE)
+
+influencePlot(fit1,scale=10,xlab="Hat-Values", ylab="Standardized Pearson residuals", id=TRUE)
+
+
+#Considerar os Ex-Fumadores como Fumadores
+
+ALS$TE2<-ALS$TE1
+table(ALS$TE1)
+
+levels(ALS$TE2)[3:4]<-("High")
+TE2<-ALS$TE2
+table(ALS$TE2)
+
+ALS2<-ALS[which(ALS$Gender=="Male"),]
+z<-complete.cases(ALS2[,c("TE2","Age","Contact","Type","Smoking")])
+ALS2<-ALS2[z,]
+
+mT1<-glm(Type~Contact+Age+TE2,family=binomial,data=ALS2) 
+summary(mT1)
+
+exp(mT1$coefficients)
+exp(confint(mT1))
+
+
+mT2<-glm(Type~Contact+Age+Contact*Age+Contact*TE2,family=binomial,data=ALS2) 
+summary(mT2)
+
+exp(mT2$coefficients)
+exp(confint(mT2))
+
+mT3<-glm(Type~Contact+Age+Contact*TE2,family=binomial,data=ALS2) 
+summary(mT3)
+
+exp(mT3$coefficients)
+exp(confint(mT3))
+
+mT4<-glm(Type~Contact+Age,family=binomial,data=ALS2) 
+summary(mT4)
+exp(mT4$coefficients)
+exp(confint(mT4))
+stukel(mT4)
+anova(mT3,mT4, test="Chisq")
+
+
+
+#Considerar exclusivamente população masculina
+
+ALS2<-ALS[which(ALS$Gender=="Male"),]
+ALS2<-ALS[which(ALS$Gender==1),]
+
+
+z<-complete.cases(ALS2[,c("TE","Age","Contact","Type","Smoking")])
+ALS2<-ALS2[z,]
+
+#Quantile 5 nós- 5,27.5, 50, 72.5 e 95
+
+quantile(ALS2$TE, probs = c(0.05, 0.275, 0.5,0.725, 0.97), na.rm = TRUE)
+#Modelo sem interações
+
+mT1<-glm(Type~Contact+Age+TE,family=binomial,data=ALS2) 
+summary(mT1)
+
+
+mT5s<-glm(Type~Contact+Age+rcs(TE,5),family=binomial,data=ALS2) 
+summary(mT5s)
+
+exp(mT1$coefficients)
+exp(confint(mT1))
+
+exp(mT5s$coefficients)
+exp(confint(mT5s))
+
+anova(mT1,mT5s, test="Chisq") 
+anova(mT1,mT1s, test="Chisq") #os modelos não diferem significativamente
+
+#Modelo com interações
+
+mT2<-glm(Type~Contact+Age+TE+Contact*Age+Contact*TE,family=binomial,data=ALS2) 
+summary(mT2)
+
+mT2s<-glm(Type~Contact+Age+rcs(TE,5)+Contact*Age+Contact*rcs(TE,5),family=binomial,data=ALS2)
+
+exp(mT2$coefficients)
+exp(confint(mT2))
+
+summary(mT2s)
+
+anova(mT5s,mT2s, test="Chisq")
+#Remover a interação Contact:Age
+
+mT3<-glm(Type~Contact+Age+TE+Contact*TE,family=binomial,data=ALS2) 
+summary(mT3)
+
+ROC(form=Type.~Contact.+Age.+TE.+Contact.*TE. ,plot="ROC")
+roc1 <- roc(ALS2$Type, ALS2$Age,ALS2$Contact)
+ci(roc1)
+
+Type.<-ALS2$Type
+Contact.<-ALS2$Contact
+TE.<-ALS2$TE
+Age.<-ALS2$Age
+
+
+mT3s<-glm(Type~Contact+Age+rcs(TE,5)+Contact*rcs(TE,5),family=binomial,data=ALS2) 
+summary(mT3s)
+
+exp(mT3$coefficients)
+exp(confint(mT3))
+
+anova(mT3,mT3s, test="Chisq")
+
+
+#Considear exclusivamente a população masculina e fumadores
+
+ALS3<-ALS2[which(ALS2$Smoking1=="Smoking"),]
+z<-complete.cases(ALS3[,c("TE","Age","Contact","Type","Smoking")])
+ALS3<-ALS3[z,]
+
+quantile(ALS3$TE, probs = c(0.05, 0.275, 0.5,0.725, 0.97), na.rm = TRUE)
+
+
+mT1<-glm(Type~Contact+Age+TE,family=binomial,data=ALS3) 
+summary(mT1)
+
+mT1s<-glm(Type~Contact+Age+rcs(TE,5),family=binomial,data=ALS3) 
+summary(mT1s)
+
+exp(mT1$coefficients)
+exp(confint(mT1))
+
+anova(mT1,mT1s, test="Chisq")
+
+mT2<-glm(Type~Contact+Age+TE+Contact*Age+Contact*TE,family=binomial,data=ALS3) 
+summary(mT2)
+
+mT2s<-glm(Type~Contact+Age+rcs(TE,5)+Contact*Age+Contact*rcs(TE,5),family=binomial,data=ALS3) 
+summary(mT2s)
+
+exp(mT2$coefficients)
+exp(confint(mT2))
+
+anova (mT2,mT2s, test="Chisq")
+
+table(ALS3$Type,ALS3$Contact)
+
+#Considear exclusivamente a população masculina e não fumadores
+
+ALS4<-ALS2[which(ALS2$Smoking1=="Non Smoking"),]
+
+z<-complete.cases(ALS4[,c("TE","Age","Contact","Type","Smoking")])
+ALS4<-ALS4[z,]
+
+table(ALS4$Type,ALS4$Contact,ALS4$Smoking)
+
+
+#Plot fumadores 
+Q2<-complete.cases(ALS[,c("Smoking","Type","Contact")])
+ALS.CC2<-ALS[Q2,]
+table(ALS.CC2$Contact,ALS.CC2$Type,ALS.CC2$Smoking)
+
+ggplot(ALS.CC2, aes(Smoking, group = Type)) +
+  geom_bar(aes(y = ..prop.., fill = factor(Type)), stat="count",position = "dodge") +
+  scale_y_continuous(labels=scales::percent)+ theme(panel.background = element_rect(fill = "white"),axis.text=element_text(size=20),
+                                                    axis.title=element_text(size=20),axis.line = element_line(color="black"),legend.text = element_text(size = 20),legend.title = element_text(size = 20),title = element_text(size = 20),strip.text.x = element_text(size = 20))+labs(title ="Smoking habits Practitioners and Non-practitioners", x = "Smoking habits", y = "Relative frequencies",fill="Type")+facet_wrap(~Contact)
+
+
+#Considerar só os não fumadores
+
+ALS3<-ALS2[which(ALS2$Smoking=="Non Smoking"),]
+
+table(ALS3$Type,ALS3$Smoking,ALS3$Contact)
+
+table(ALS$Type,ALS$Smoking,ALS$Contact)
+
+############
+###Parte 2##- Relacionar prática desportiva com início de doença mais cedo principalmente em futebolistas
+############
+
+Q2<-complete.cases(ALS[,c("Football","Diag.Age")])#,"Onset")])
+ALS.CC2<-ALS[Q2,]
+summary(ALS.CC2$Diag.Age)
+
+# Futebol
+levels(ALS3$Football)[3:4]<-"Intense activity"
+
+boxplot(ALS.CC2$Diag.Age ~ ALS.CC2$Football,data=subset(ALS.CC2,Type=="Patients"),
+        xlab = "Football", ylab = "Diagnosis Age",
+        frame = FALSE, col = c("blue", "red", "green"))
+
+ggplot(ALS.CC2, aes(x=Football, y=Diag.Age)) +
+  geom_boxplot(aes(fill=Football))+
+  labs(x="Football", y = "Diagnostic Age (years)")+theme(panel.background = element_rect(fill = "white"),axis.text=element_text(size=20),
+                                                         axis.title=element_text(size=20),axis.line = element_line(color="black"),legend.text = element_text(size = 20),legend.title = element_text(size = 20),title = element_text(size = 20))
+
+boxplot(ALS.CC2$Diag.Age ~ ALS.CC2$Football*ALS.CC2$Onset,data=subset(ALS.CC2,Type=="Patients"),
+        xlab = "Football", ylab = "Diagnosis Age",
+        frame = FALSE, col = c("blue", "red", "green"))
+
+ggplot(ALS.CC2[611:1047,], aes(x=ALS.CC2[611:1047,]$Football, y=ALS.CC2[611:1047,]$Diag.Age)) +
+  geom_boxplot(aes(fill=ALS.CC2[611:1047,]$Football))+
+  labs(x="Football", y = "Diagnostic Age (years)",fill="Football")+theme(panel.background = element_rect(fill = "white"),axis.text=element_text(size=20),
+                                                                         axis.title=element_text(size=20),axis.line = element_line(color="black"),legend.text = element_text(size = 20),legend.title = element_text(size = 20),title = element_text(size = 20))
+
+library(dplyr)
+
+#Modalidades de Contacto
+boxplot(ALS$Diag.Age ~ ALS.CC2$Contact*ALS.CC2$Onset,
+        xlab = "Contact Sports", ylab = "Diagnosis Age",
+        frame = FALSE, col = c("blue", "red"))
+
+
+
+# Compute the analysis of variance- Futebol
+res.aov <- aov(ALS3$Diag.Age ~ ALS3$Football)
+res.aovP <- aov(ALS3[611:1047,]$Diag.Age ~ ALS3[611:1047,]$Football)
+res.aovPl<-aov(log(ALS3[611:1047,]$Diag.Age) ~ ALS3[611:1047,]$Football)
+
+ALSP<-ALS3[611:1047,]
+ALSPo<-ALSP[-c(365,183,176 ),]
+res.aovPo <- aov(Diag.Age ~ Football,data = ALSPo)
+
+# Summary of the analysis
+summary(res.aov)
+plot(res.aov,1)
+dev.print(pdf, "A2.pdf")
+plot(res.aov,2)
+dev.print(pdf, "Aq2.pdf")
+summary(res.aovPo)
+plot(res.aovP,2)
+summary(res.aovPl)
+
+
+plot(res.aovP,3)
+plot(res.aovPl,1)
+plot(res.aovPl,3)
+dev.print(pdf, "A1.pdf")
+plot(res.aovP,2)
+dev.print(pdf, "Aq1.pdf")
+
+summary(res.aovP)
+plot(res.aovP,1)
+bartlett.test(res.aovP)
+plot(res.aovP,2)
+#Desportos de Contacto
+res.aov2 <- aov(ALS.CC2$Diag.Age ~ ALS.CC2$Contact)
+# Summary of the analysis
+summary(res.aov2)
+View(ALS$Id)
+
+#Modelo linear- Idade de diagnóstico
+
+#Considerando apenas a população portuguesa
+#Média por grupo
+subset(ALS[611:1047,])  %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    mean_pr = mean(Diag.Age, na.rm= TRUE)
+  )
+
+#Desvio Padrão
+
+subset(ALS[611:1047,])  %>%
+  group_by (Football) %>%
+  summarise(
+    n = n(),
+    st_pr = sd(Diag.Age, na.rm=TRUE)
+  )
+
+#Mediana
+
+
+subset(ALS[611:1047,])  %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    median_pr = median(Diag.Age, na.rm=T)
+  )
+
+#Mínimo
+subset(ALS[611:1047,]) %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    min_pr = min(Diag.Age, na.rm=T)
+  )
+
+#Máximo
+subset(ALS[611:1047,]) %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    max_pr = max(Diag.Age, na.rm=T)
+  )
+
+
+boxplot(ALS[611:1047,]$Diag.Age ~ ALS[611:1047,]$Football,data=ALS[611:1047,],
+        xlab = "Football", ylab = "Diagnosis Age",
+        frame = FALSE, col = c("blue", "red", "green"))
+
+q<-lm(Diag.Age~Football,data=ALS[611:1047,])
+summary(q)
+anova(q)
+
+require(ggsignif)
+
+Q7<-complete.cases(ALS[,c("Diag.Age","Football")])#,"Onset")])
+ALS7<-ALS[Q7,]
+
+ggplot(ALS7, aes(x = Football, y = Diag.Age)) +
+  geom_boxplot(fill = "grey80", colour = "blue") +
+  scale_x_discrete() + xlab("Football intensity") +
+  ylab("Diag.Age") +
+  geom_signif(comparisons = list(c("group_1", "group_2","group_3")),
+              map_signif_level=TRUE)
+
+res.aovP<-aov(ALS[611:1047,]$Diag.Age ~ ALS[611:1047,]$Football)
+summary(res.aovP) # Para o nível de significancia de 5% rejeita-se a hipótese que a idade média de diagnóstico, é igual para os 3 níveis de intensidade
+coef(res.aovP)
+
+#µˆ1 = 64.5287742: média amostral da idade de diagnóstico para os não praticantes;
+#αˆ2 =  0.8794449: acréscimo que, somado à média amostral dos não praticantes,
+#dá a média amostral da idade de diagnóstico dos praticantes de forma leve (64.5287742+0.8794449 = 65.4082191)
+#αˆ3 =  -7.9588351 : decrés que, somadoà média amostral dos não praticantes,dá a média amostral
+#da idade de diagnóstico dos não praticantes (64.5287742-7.9588351=56.5699391)
+
+model.tables(res.aovP , type="means") # Pelo teste de Tuckey, vemos que a idade média de diagnóstico, apenes difere quando comparamos os praticantes de futebol de alta intensidade, com os não praticantes.
+model.tables(res.aovP , type="effect")
+table(ALS[611:1047,]$Football)
+
+ALSP<-ALS[611:1047,]
+
+#Comparações multiplas
+Tuckeytest<-TukeyHSD(aov(Diag.Age ~ Football, data=ALS[611:1047,]));Tuckeytest
+plot(Tuckeytest)
+
+Tuckeytest<-TK.test(ALSP$Diag.Age,ALSP$Football) #DTK package
+
+DTKtest<-DTK.test(ALSP$Diag.Age,ALSP$Football,a=0.05) 
+#Delineamento não equilibrado, temos de recorrer a um método de comparações alternativo-
+#Tukey-Kramer Test
+
+S<-pairw.anova(ALS[611:1047,]$Diag.Age, ALS[611:1047,]$Football, conf.level = 0.95, method = "tukey",
+               MSE = NULL, df.err = NULL, control = NULL);S
+plot(S,type = 2)
+
+#Teste de Kramer manualmente
+
+N <- length(ALS[611:1047,]$Diag.Age) # total sample size
+k <- length(unique(ALS[611:1047,]$Football)) # number of treatments
+n1 <- 1/385
+n2<-1/5
+n3<-1/36
+
+# Mean Square
+mse<-12.77803^2
+
+#q-value
+q.value <- qtukey(p = 0.95, nmeans = k, df = N - k);q.value
+
+#
+tukey1 <- q.value * sqrt((mse / 2)*(n1+n2));tukey1
+tukey2 <- q.value * sqrt((mse / 2)*(n1+n3));tukey2
+tukey3<- q.value * sqrt((mse / 2)*(n2+n3));tukey3
+
+#Diferenças
+means <- tapply(ALS[611:1047,]$Diag.Age, ALS[611:1047,]$Football, mean)
+
+No.Mild<- means[1] - means[2];No.Mild #Não há diferença (0.8794449 < 14.83331)
+No.Intense <- means[1] - means[3];No.Intense # Há difernça
+Mild.Intense<- means[2] - means[3];Mild.Intense #Não há diferença
+
+#Intervalos de Confiança
+No.Mild.upper <- No.Mild + q.value * sqrt((mse / 2)*(n1+n2));No.Mild.upper
+No.Mild.lower <- No.Mild - q.value * sqrt((mse / 2)*(n1+n2));No.Mild.lower
+#[-15.71276;13.95387]
+No.Intense.upper <- No.Intense + q.value * sqrt((mse / 2)*(n1+n3));No.Intense.upper
+No.Intense.lower <- No.Intense - q.value * sqrt((mse / 2)*(n1+n3));No.Intense.lower
+#[2.215283;13.7039]
+Mild.Intense.upper <- Mild.Intense + q.value * sqrt((mse / 2)*(n2+n3));Mild.Intense.upper
+Mild.Intense.lower <- Mild.Intense - q.value * sqrt((mse / 2)*(n2+n3));Mild.Intense.lower
+#[-6.889841;24.5664;]
+
+
+#Pressupostos
+plot(res.aovP)
+#Toda a população
+
+#Média por grupo
+
+subset(ALS[1:1326,])  %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    mean_pr = mean(Diag.Age, na.rm=TRUE)
+  )
+
+#Desvio Padrão
+
+subset(ALS[1:1326,])  %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    sd_pr = sd(Diag.Age, na.rm=TRUE)
+  )
+
+
+#Mediana
+subset(ALS[1:1326,])  %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    median_pr = median(Diag.Age, na.rm=TRUE)
+  )
+
+#Mínimo
+subset(ALS[1:1326,]) %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    min_pr = min(Diag.Age, na.rm=T)
+  )
+
+#Máximo
+subset(ALS[1:1326,]) %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    max_pr = max(Diag.Age, na.rm=T)
+  )
+
+
+
+boxplot(ALS[1:1326,]$Diag.Age ~ ALS[1:1326,]$Football,data=ALS[1:1326,],
+        xlab = "Football", ylab = "Diagnosis Age",
+        frame = FALSE, col = c("blue", "red", "green"))
+
+
+ALS1<-subset(ALS,ALS$Type=="Patients")
+
+q1<-lm(ALS[1:1326,]$Diag.Age~ALS[1:1326,]$Football,data=ALS[1:1326,])
+summary(q1)
+anova(q1)
+res.aov <- aov(ALS[1:1326,]$Diag.Age ~ ALS[1:1326,]$Football)
+
+
+summary(res.aov) # Para o nível de significancia de 5% não se rejeita a hipótese que a idade média de diagnóstico, é igual para os 3 níveis de intensidade
+coef(res.aov)
+
+model.tables(res.aov , type="means") # Pelo teste de Tuckey, vemos que a idade média de diagnóstico, apenes difere quando comparamos os praticantes de futebol de alta intensidade, com os não praticantes.
+
+Tuckeytestg<-TukeyHSD(aov(Diag.Age ~ Football, data=ALS[1:1326,]));Tuckeytestg
+
+
+
+#Idade 1ª manifestação
+
+#Considerando apenas a população portuguesa
+
+#Média por grupo
+
+subset(ALS[611:1047,])  %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    mean_pr = mean(Age.1st.Sym, na.rm=TRUE))
+
+#Desvio padrão
+subset(ALS[611:1047,])  %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    sd_pr = sd(Age.1st.Sym, na.rm=TRUE)
+  )
+
+
+#Mediana
+subset(ALS[611:1047,])  %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    median_pr = median(Age.1st.Sym, na.rm=T)
+  )
+
+#Mínimo
+subset(ALS[611:1047,]) %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    min_pr = min(Age.1st.Sym, na.rm=T)
+  )
+
+#Máximo
+subset(ALS[611:1047,]) %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    max_pr = max(Age.1st.Sym, na.rm=T)
+  )
+
+boxplot(ALS[611:1047,]$Age.1st.Sym ~ ALS[611:1047,]$Football,data=ALS[611:1047,],
+        xlab = "Football Level", ylab = "Diagnosis Age")#,
+#frame = FALSE)#, col = c("blue", "red", "green")
+
+qM<-lm(ALS[611:1047,]$Age.1st.Sym~ALS[611:1047,]$Football,data=subset(ALS[611:1047,]))
+summary(qM)
+anova(qM)
+
+
+res.aovqM<-aov(ALS[611:1047,]$Age.1st.Sym~ ALS[611:1047,]$Football)
+summary(res.aovqM) # Para o nível de significancia de 5% rejeita-se a hipótese que a idade média de diagnóstico, é igual para os 3 níveis de intensidade
+coef(res.aovqM)
+
+#µˆ1 = 63.10352: média amostral da idade da 1ª manifestação para os não praticantes;
+#αˆ2 = 1.922468  : acréscimo que, somado à média amostral dos não praticantes,
+#dá a média amostral da idade de diagnóstico dos praticantes de forma leve (63.103532 +1.922468 = 65.026)
+#αˆ3 =  -8.267699  : decrés que, somadoà média amostral dos não praticantes,dá a média amostral
+#da idade de diagnóstico dos não praticantes (63.103532-8.267699 =54.83583)
+
+model.tables(res.aovqM , type="means") # Pelo teste de Tuckey, vemos que a idade média de diagnóstico, apenes difere quando comparamos os praticantes de futebol de alta intensidade, com os não praticantes.
+
+#Comparações multiplas
+T<-TukeyHSD(aov(Age.1st.Sym~ Football,data=ALS[611:1047,])) # Existem diferenças entre Intense activity-No
+plot(T)
+
+
+
+#Toda a população
+#Média por grupo
+
+subset(ALS[1:1326,])  %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    mean_pr = mean(Age.1st.Sym, na.rm=T)
+  )
+
+#Mediana
+subset(ALS[1:1326,])  %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    median_pr = median(Age.1st.Sym, na.rm=T)
+  )
+
+#Mínimo
+subset(ALS[1:1326,]) %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    min_pr = min(Age.1st.Sym, na.rm=T)
+  )
+
+#Máximo
+subset(ALS[1:1326,]) %>%
+  group_by(Football) %>%
+  summarise(
+    n = n(),
+    max_pr = max(Age.1st.Sym, na.rm=T)
+  )
+
+boxplot(ALS[1:1326,]$Age.1st.Sym ~ ALS[1:1326,]$Football,data=ALS[1:1326,],
+        xlab = "Football level", ylab = "Diagnosis Age")
+#frame = FALSE)#, col = c("blue", "red", "green"))
+
+q1M<-lm(ALS[1:1326,]$Age.1st.Sym~ALS[1:1326,]$Football,data=ALS[1:1326,])
+summary(q1M)
+anova(q1M)
+reaovM<-aov(ALS[1:1326,]$Age.1st.Sym~ALS[1:1326,]$Football)
+summary(reaovM)#Não existem diferenças
+coef(reaovM)
+model.tables(reaovM , type="means")
+model.tables(reaovM , type="effects")
+?model.tables
+
+### Pressuposto da normalidade não é respeitado, desta forma não podemos considerar a ANOVA, nem os glm
+
+shapiro.test(ALS[611:1047,]$Diag.Age) #n elevado, podemos considerar o modelo mesmo assim??
+shapiro.test(ALS[1:1326,]$Diag.Age)
+hist(ALS[611:1047,]$Diag.Age)
+hist(ALS1$Age.1st.Sym)
+
+
+###Teste homogeneidade
+
+bartlett.test(ALS3[611:1047,]$Diag.Age~ALS3[611:1047,]$Football)
+leveneTest(ALS3[611:1047,]$Diag.Age~ALS3[611:1047,]$Football,data=ALS3[611:1047,])
+bartlett.test(ALS[1:1326,]$Diag.Age~ALS[1:1326,]$Football)#0.1978 não se
+plot(q1)
+library(car)
+
+install.packages("car")
+#Modalidades de contacto
+s<-lm(ALS$Diag.Age~ALS$Contact,data =ALS[611:1047,])
+summary(s)
+
+
+T1<-subset(ALS,Gender=="Male"& Type=="Patients")
+T1.1<-subset(ALS,Gender=="Male"& Type=="Controls")
+view(T1)
+table(T1$Type)
+
+T2<-subset(ALS,Gender=="Female"&Type=="Patients")
+T2.1<-subset(ALS,Gender=="Female"&Type=="Controls")
+
+mean(na.omit(T2$Diag.Age))
+ALS[298,]
+
+###Relacionar Onset com género e idade
+o<-glm(ALS$Onset~ALS$Gender+ALS$Age,family = binomial,data=ALS)
+summary(o)
+
+
+
+##############################################
+### Análise de regressão multinomial ALSFRs###
+##############################################
+
+install.packages("mlogit")
+library(mlogit)
+
+#Primeiro definir a categoria de referência
+ALS$P.G<-  relevel (ALS$P.G,  ref  =  "Slow" ) #Qual  a classe de referência que faz mais sentido
+require(nnet)
+P.G<-ALS$P.G
+
+#Modelos univariados
+xA<-multinom(P.G~Age,data =ALS)
+summary(xA)
+z <- summary(xA)$coefficients/summary(xA)$standard.errors;z
+
+p <- (1 - pnorm(abs(z), 0, 1)) * 2;p #Age candidata a entrar no modelo
+
+xAC<-multinom(P.G ~ALS$agegroups,data = ALS)
+summary(xAC)
+z <- summary(xAC)$coefficients/summary(xAC)$standard.errors;z
+p <- (1 - pnorm(abs(z), 0, 1)) * 2;p #Age candidata a entrar no modelo
+
+tidy(xAC, conf.int = TRUE, conf.level = 0.95,     exponentiate = FALSE)
+tidy(xAC, conf.int = TRUE, conf.level = 0.95,     exponentiate =TRUE)
+
+
+xG<-multinom(P.G ~Gender, data =ALS)
+summary(xG)
+z <- summary(xG)$coefficients/summary(xG)$standard.errors;z
+p <- (1 - pnorm(abs(z), 0, 1)) * 2;p #Candidata a entrar no modelo
+tidy(xG, conf.int = TRUE, conf.level = 0.95,     exponentiate = FALSE)
+tidy(xG, conf.int = TRUE, conf.level = 0.95,     exponentiate =TRUE)
+
+xT<-multinom(P.G ~TE, data =ALS)
+summary(xT)
+z <- summary(xT)$coefficients/summary(xT)$standard.errors;z
+p <- (1 - pnorm(abs(z), 0, 1)) * 2;p #Não é candidata a entrar no modelo
+tidy(xT, conf.int = TRUE, conf.level = 0.95,     exponentiate = FALSE)
+tidy(xT, conf.int = TRUE, conf.level = 0.95,     exponentiate =TRUE)
+
+
+xO<-multinom(P.G ~Onset, data =ALS)
+summary(xO)
+z <- summary(xO)$coefficients/summary(xO)$standard.errors;z
+p <- (1 - pnorm(abs(z), 0, 1)) * 2;p #Candidata a entrar no modelo
+tidy(xO, conf.int = TRUE, conf.level = 0.95,     exponentiate = FALSE)
+tidy(xO, conf.int = TRUE, conf.level = 0.95,     exponentiate =TRUE)
+
+xA1<-multinom(P.G ~ALS$Age.1st.Sym, data =ALS)
+summary(xA1)
+z <- summary(xA1)$coefficients/summary(xA1)$standard.errors;z
+p <- (1 - pnorm(abs(z), 0, 1)) * 2;p #Não é candidata a entrar no modelo
+tidy(xA1, conf.int = TRUE, conf.level = 0.95,     exponentiate = FALSE)
+tidy(xA1, conf.int = TRUE, conf.level = 0.95,     exponentiate =TRUE)
+
+xD<-multinom(P.G ~ALS$Diagnostic.delay, data =ALS)
+summary(xD)
+z <- summary(xD)$coefficients/summary(xD)$standard.errors;z
+p <- (1 - pnorm(abs(z), 0, 1)) * 2;p #Não é candidata a entrar no modelo
+tidy(xD, conf.int = TRUE, conf.level = 0.95,     exponentiate = FALSE)
+tidy(xD, conf.int = TRUE, conf.level = 0.95,     exponentiate =TRUE)
+
+x9<-multinom(P.G ~C9, data =ALS)
+summary(x9)
+z <- summary(x9)$coefficients/summary(x9)$standard.errors;z
+p <- (1 - pnorm(abs(z), 0, 1)) * 2;p #Candidata a entrar no modelo
+
+xSOD1<-multinom(P.G ~SOD1, data =ALS)
+summary(xSOD1)
+z <- summary(xSOD1)$coefficients/summary(xSOD1)$standard.errors;z
+p <- (1 - pnorm(abs(z), 0, 1)) * 2;p #Candidata a entrar no modelo
+
+xContact<-multinom(P.G ~Contact, data =ALS)
+summary(xContact)
+z <- summary(xContact)$coefficients/summary(xContact)$standard.errors;z
+p <- (1 - pnorm(abs(z), 0, 1)) * 2;p #Candidata a entrar no modelo
+tidy(xContact, conf.int = TRUE, conf.level = 0.95,     exponentiate = FALSE)
+tidy(xContact, conf.int = TRUE, conf.level = 0.95,     exponentiate =TRUE)
+
+
+#Análise multivariada
+x<-multinom(P.G ~ALS$agegroups+Gender+Onset+ALS$Age.1st.Sym+ALS$Diagnostic.delay+Contact, data =ALS)
+summary(x)
+tidy(x, conf.int = TRUE, conf.level = 0.95,     exponentiate = FALSE)
+tidy(x, conf.int = TRUE, conf.level = 0.95,     exponentiate =TRUE)
+
+#Este sumário não nos dá, o valor do p-value temos de o calcular através do teste de Wald
+z <- summary(x)$coefficients/summary(x)$standard.errors;z
+x2<-glm(P.G~agegroups+Gender+Onset+Age.1st.Sym+Diagnostic.delay+Contact,family = binomial, data =subset(ALS,ALS$P.G!="Fast"))
+summary(x2)
+p <- (1 - pnorm(abs(z), 0, 1)) * 2;p
+
+exp(coef(x))##Odds ratio comparativamente à classe de referência slow
+
+table(ALS$P.G) #Slow 615, Fast-175 and Neutral 498
+
+
+##############################
+#### Análise de sobrevivênca##
+#############################
+
+
+
+####Estimativa de Kaplen-Meyer
+.Surv<-survfit(Surv(D.B1.VY,Status1) ~1, conf.type="log", conf.int=0.95,
+               type="kaplan-meier", error="greenwood", data=ALS[641:1047,]);.Surv
+plot(.Surv, conf.int=TRUE, mark.time=TRUE,ylab = "Função de sobrevivência",xlab = "Tempo em anos")
+
+.Surv2<-survfit(Surv(D.B.1.DY,Status2) ~1, conf.type="log", conf.int=0.95,
+                type="kaplan-meier", error="greenwood", data=ALS[641:1047,]);.Surv2
+
+plot(.Surv2, conf.int=TRUE, mark.time=TRUE,ylab = "Função de sobrevivência",xlab = "Tempo em anos")
+
+#Modelos univariados
+res.coxG <- coxph(Surv(ALS$D.B.1.DY,Status2) ~ Gender,data=ALS)
+summary(res.coxG)
+
+res.coxA <- coxph(Surv(ALS$D.B.1.DY,Status2) ~ Age,data=ALS)
+summary(res.coxA)
+
+res.coxAC <- coxph(Surv(ALS$D.B.1.DY,Status2) ~ ALS$agegroups,data=ALS)
+summary(res.coxAC)
+
+res.coxC <- coxph(Surv(ALS$D.B.1.DY,Status2) ~ Contact,data=ALS)
+summary(res.coxC)#Não é candidata  a entrar no modelo
+
+res.coxT <- coxph(Surv(ALS$D.B.1.DY,Status2) ~ TE,data=ALS)
+summary(res.coxT)#Não é candidata a entra no modelo
+
+res.coxO <- coxph(Surv(ALS$D.B.1.DY,Status2) ~Onset,data=ALS)
+summary(res.coxO)
+
+res.coxC9 <- coxph(Surv(ALS$D.B.1.DY,Status2) ~ C9,data=ALS)
+summary(res.coxC9)
+
+res.coxSOD1 <- coxph(Surv(ALS$D.B.1.DY, Status2) ~ SOD1,data=ALS)
+summary(res.coxSOD1)
+
+res.coxP <- coxph(Surv(ALS$D.B.1.DY,Status2) ~ ALS$P.G,data=ALS)
+summary(res.coxP)
+
+res.coxSmok <- coxph(Surv(ALS$D.B.1.DY,Status2) ~ Smoking,data=ALS)
+summary(res.coxSmok)
+
+
+#Modelos multivariados
+res.cox <- coxph(Surv(ALS$D.B.1.DY) ~ Age+Gender+Onset+ALS$SOD1+Smoking+ALS$P.G, data = ALS)
+summary(res.cox)
+
+#Retirar variáveis não significativas
+res.cox1<-coxph(Surv(ALS$D.B.1.DY) ~ Onset+Smoking+ALS$P.G, data = ALS)
+summary(res.cox1)
+
+
+
+.SurvO<-survfit(Surv(D.B.1.DY,Status2) ~Onset, conf.type="log", conf.int=0.95,
+                type="kaplan-meier", error="greenwood", data=ALS);.SurvO
+
+plot(.SurvO, conf.int=TRUE, mark.time=TRUE,ylab = "Função de sobrevivência",xlab = "Tempo em anos")
+ggsurvplot(.SurvO, data = ALS[1:1326,])
+
+ggsurvplot(.SurvO, data = ALS[1:1326.],
+           surv.median.line = "hv", # Add medians survival
+           
+           # Change legends: title & labels
+           legend.title = "Onset",
+           legend.labs = c("MLimbs", "Bulbar"),
+           # Add p-value and tervals
+           pval = TRUE,
+           
+           conf.int = TRUE,
+           # Add risk table
+           risk.table = TRUE,
+           tables.height = 0.2,
+           tables.theme = theme_cleantable(),
+           
+           # Color palettes. Use custom color: c("#E7B800", "#2E9FDF"),
+           # or brewer color (e.g.: "Dark2"), or ggsci color (e.g.: "jco")
+           palette = c("#E7B800", "#2E9FDF"),
+           ggtheme = theme_bw() # Change ggplot2 theme
+)
+
+
+.SurvS<-survfit(Surv(D.B.1.DY,Status2) ~Smoking, conf.type="log", conf.int=0.95,
+                type="kaplan-meier", error="greenwood", data=ALS);.SurvS
+
+plot(.SurvS, conf.int=TRUE, mark.time=TRUE,ylab = "Função de sobrevivência",xlab = "Tempo em anos")
+ggsurvplot(.SurvS,data=ALS[1:1326,])
+
+
+.SurvP<-survfit(Surv(D.B.1.DY,Status2) ~ALS$P.G, conf.type="log", conf.int=0.95,
+                type="kaplan-meier", error="greenwood", data=ALS);.SurvP
+
+plot(.SurvP, conf.int=TRUE, mark.time=TRUE,ylab = "Função de sobrevivência",xlab = "Tempo em anos")
+ggsurvplot(.SurvP,data=ALS[1:1326,])
+
+
